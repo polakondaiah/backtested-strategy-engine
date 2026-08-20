@@ -19,20 +19,29 @@ def load_prices():
     df = df.sort_values(["Ticker","Date"])
     return df
 
-def backtest(df: pd.DataFrame, cost_bps: int = COST_BPS):
+def backtest(df: pd.DataFrame, cost_bps: int = COST_BPS, z_window: int = 20,
+             impact_bps_per_vol: float = 0.5):
+    """
+    impact_bps_per_vol: extra slippage (bps) per unit of trailing 20-day
+    realized volatility, on top of the flat cost_bps -- a flat cost alone
+    understates real execution cost in high-volatility regimes, so impact
+    scales with recent realized vol as a simple, standard proxy (Almgren-
+    Chriss-style linear impact, without the full optimal-execution model).
+    """
     from .strategy import add_signals
-    # compute signals
-    df = add_signals(df)
-    # forward return: (Close[t+1]/Close[t]-1) per ticker
-    df["fwd_ret"] = df.groupby("Ticker")["Close"].pct_change().shift(-1) * -1  # placeholder calc fix below
-    # correct fwd_ret: next day return
+    df = add_signals(df, window=z_window)
+
+    # next-bar-close forward return per ticker (position decided at t, earned at t+1)
     df["fwd_ret"] = df.groupby("Ticker")["Close"].transform(lambda s: s.pct_change().shift(-1))
-    # Actually we want position at t to earn fwd_ret at t. So shift position.
-    # Signal at t uses close[t], but position must be lagged: pos_lagged = pos_raw.shift(1)
+    # position at t is the signal computed using data up to close[t], shifted
+    # forward one bar so it only ever trades on already-known information
     df["position"] = df.groupby("Ticker")["pos_raw"].shift(1)
-    # turnover
+
     df["turnover"] = df.groupby("Ticker")["position"].diff().abs().fillna(df["position"].abs())
-    df["cost"] = df["turnover"] * (cost_bps / 10000.0)
+    realized_vol = df.groupby("Ticker")["Close"].transform(
+        lambda s: s.pct_change().rolling(20).std().fillna(0))
+    df["cost_bps_effective"] = cost_bps + impact_bps_per_vol * (realized_vol * 100)
+    df["cost"] = df["turnover"] * (df["cost_bps_effective"] / 10000.0)
     df["strategy_ret"] = df["position"] * df["fwd_ret"] - df["cost"]
     # drop NaNs (warmup + last bar)
     bt = df.dropna(subset=["position","fwd_ret","strategy_ret"]).copy()

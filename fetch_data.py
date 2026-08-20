@@ -23,6 +23,12 @@ OUT_PARQUET = DATA_DIR / "prices.parquet"
 def generate_synthetic():
     """Deterministic GBM synthetic data - reproducible, no network needed."""
     rng = np.random.default_rng(42)
+    # Separate RNG stream for volume, seeded independently so fixing the
+    # volume model can't silently shift the price series (and every
+    # downstream Sharpe/IC/regression number derived from it) -- volume and
+    # price generation are logically independent draws and should be
+    # independently reproducible.
+    vol_rng = np.random.default_rng(4200)
     dates = pd.bdate_range(START, END)  # business days only
     n = len(dates)
     rows = []
@@ -34,9 +40,19 @@ def generate_synthetic():
         rets = rng.normal(mu, sigma, n)
         # inject some mean-reversion structure via OU overlay for 2 tickers
         prices = s0 * np.exp(np.cumsum(rets))
-        # add small random gaps
-        vol = prices * sigma * rng.uniform(0.8, 1.2, n) * 8
-        vol = np.clip(vol.astype(int), 1_000_000, 50_000_000)
+        # Volume: base level per ticker (random draw, so cross-sectional
+        # variation exists) x day-to-day lognormal noise x a volume-follows-
+        # volatility bump on days with large |return| (a standard empirical
+        # regularity -- turnover spikes on big move days). Previously this
+        # scaled with price*sigma directly and was clipped to a floor that
+        # swallowed all cross-sectional/day-to-day variation, producing a
+        # constant Volume column (std=0) that silently broke any signal
+        # built on it (e.g. volume z-score) -- fixed here.
+        base_vol = vol_rng.uniform(2_000_000, 15_000_000)
+        daily_noise = np.exp(vol_rng.normal(0, 0.35, n))
+        move_bump = 1 + 3 * np.abs(rets - mu) / sigma  # sigma is a per-ticker scalar > 0
+        vol = base_vol * daily_noise * move_bump
+        vol = np.clip(vol.astype(int), 500_000, 80_000_000)
         for i, d in enumerate(dates):
             o = prices[i] * rng.uniform(0.99, 1.01)
             h = max(o, prices[i]) * rng.uniform(1.0, 1.015)
