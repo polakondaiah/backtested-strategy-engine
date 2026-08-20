@@ -2,6 +2,9 @@
 
 **Flagship project for:** Quant Researcher, NK Securities Research (Gurugram) — also referenced by WorldQuant, iRage applications. Closes three gaps at once: C++ depth, Linux/shell, trading exposure.
 
+## Description
+A production-style backtesting engine built in Python with a C++ accelerated core. It ingests daily NSE equity data (or synthetic fallback), generates a mean-reversion z-score signal, simulates an equal-weight portfolio with transaction costs and no lookahead bias, and produces P&L, Sharpe, drawdown, and equity curves. A Linux shell pipeline automates data-pull → validation → backtest → benchmark, and the inner P&L loop is rewritten in C++ via pybind11 for a 100×+ speedup. The project demonstrates market exposure, rigorous backtest hygiene, and systems-level performance work suitable for a quant research role.
+
 ## Methodology
 - **Universe:** 8 NSE large-caps (RELIANCE.NS, TCS.NS, INFY.NS, HDFCBANK.NS, ICICIBANK.NS, SBIN.NS, BHARTIARTL.NS, ITC.NS) — liquid, India-specific per plan. Daily OHLCV 2020-01-01 to 2026-08-20 (~1,732 business days, 13,856 rows).
 - **Data:** `fetch_data.py` tries `yfinance` then deterministic synthetic GBM fallback (seed 42) if offline — validates row counts, missing dates, duplicates, nulls, writes `data/prices.csv`.
@@ -46,12 +49,6 @@ bash run_pipeline.sh               # full automated pipeline
 - Survivorship bias: universe is current large-caps; delisted stocks excluded — noted, not hidden.
 - Single signal only; regime breaks (trending markets hurt mean-reversion) not hedged.
 - Synthetic fallback used when yfinance offline — rerun with live data for production numbers.
-
-## Interview prep
-- Why z-score mean-reversion and when it breaks (strong trends)?
-- How lookahead is prevented (`shift(1)`, fwd_ret is *next* day)?
-- Why Python loop is ~148x slower (interpreter per-iteration overhead)?
-- What changes with tick data (microstructure, latency, market impact)?
 
 ## Structure
 ```
