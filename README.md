@@ -1,7 +1,5 @@
 # Backtested Trading Strategy Engine
 
-**Flagship project for:** Quant Researcher, NK Securities Research (Gurugram) — also referenced by WorldQuant, iRage applications. Closes three gaps at once: C++ depth, Linux/shell, trading exposure.
-
 ## Description
 A production-style backtesting engine built in Python with a C++ accelerated core. It ingests daily NSE equity data (or synthetic fallback), generates a mean-reversion z-score signal, simulates an equal-weight portfolio with transaction costs and no lookahead bias, and produces P&L, Sharpe, drawdown, and equity curves. A Linux shell pipeline automates data-pull → validation → backtest → benchmark, and the inner P&L loop is rewritten in C++ via pybind11 for a 100×+ speedup. The project demonstrates market exposure, rigorous backtest hygiene, and systems-level performance work suitable for a quant research role.
 
