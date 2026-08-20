@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.so
+results/
+pipeline.log
+data/*.parquet
+.venv/

@@ -1,0 +1,4 @@
+source: synthetic (forced)
+rows: 13856
+range: 2020-01-01 00:00:00 to 2026-08-20 00:00:00
+written: 2026-08-20T16:57:56.049441
